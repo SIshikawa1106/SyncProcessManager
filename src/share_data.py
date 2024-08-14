@@ -88,7 +88,7 @@ class SharedMemoeryData:
         with self.condition:
             return self._get_frame(frame_index, self.current_frame_index.value)
     
-class SharedMemoeryDataWithTime:
+class SharedMemoryDataWithTime:
     def __init__(self, memory_info: dict, time_memory_info: dict=None, create: bool=False):
         self.memory = SharedMemoeryData(memory_info, create)
         
