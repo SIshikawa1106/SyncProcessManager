@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import numpy as np
+os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
 import cv2
 
 currdir = os.path.dirname(__file__)
@@ -28,14 +29,16 @@ class CameraProcess(process.Process):
             self.log_dir = None
         
     def _init_func(self):
-        os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
-        self.cap = cv2.VideoCapture(self.camera_index)
-        
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.memory_info[0]['shape'][0])
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.memory_info[0]['shape'][1])
-                
-        print(f"cap = {self.cap}")
-        self.memory = share_data.SharedMemoryDataWithTime(self.memory_info[0], self.memory_info[1])
+        try:
+            self.cap = cv2.VideoCapture(self.camera_index)
+            
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.memory_info[0]['shape'][0])
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.memory_info[0]['shape'][1])
+                    
+            print(f"cap = {self.cap}")
+            self.memory = share_data.SharedMemoryDataWithTime(self.memory_info[0], self.memory_info[1])
+        except Exception as e:
+            print(e)
 
     def _loop_func(self):
         
@@ -44,9 +47,9 @@ class CameraProcess(process.Process):
             if ret:
                 counter = self.memory.add_frame(frame)
             
-            if self.verbose:
-                cv2.imshow(f'camera {self.camera_index}', frame)
-                cv2.waitKey(1)
+                if self.verbose:
+                    cv2.imshow(f'camera {self.camera_index}', frame)
+                    cv2.waitKey(1)
                 
             if self.log_dir:
                 if not os.path.isdir(self.log_dir):
@@ -55,17 +58,25 @@ class CameraProcess(process.Process):
                 filename = os.path.join(self.log_dir, f"{counter}.png")
                 threading.Thread(target=lambda f=frame, fn=filename: cv2.imwrite(fn, f), daemon=True).start()
         except:
+            import traceback
+            traceback.print_exc()
             pass
         
+    def _end_func(self):
+        if hasattr(self, "cap"):
+            self.cap.release()
 
 if __name__=="__main__":
     
     memory_info = share_data.make_info(100, (480,640,3), np.uint8)
-    memory = share_data.SharedMemoryDataWithTime(memory_info, None, True)
-    memory_info = memory.memory_info
+    memory_1 = share_data.SharedMemoryDataWithTime(memory_info, None, True)
+    memory_2 = share_data.SharedMemoryDataWithTime(memory_info, None, True)
+    memory_info_1 = memory_1.get_memory_info()
+    memory_info_2 = memory_2.get_memory_info()
     
     processes = [
-        CameraProcess(0, memory_info, verbose=True)
+        CameraProcess(0, memory_info_1, verbose=True, log_dir="./cam/"),
+        CameraProcess(1, memory_info_2, verbose=True, log_dir="./cam/")
     ]
     
     mgr = manager.SyncMainProcess()
@@ -74,8 +85,9 @@ if __name__=="__main__":
     while not mgr.start_sync_event.is_set():
         print("Wait ...")
         time.sleep(1)
-    time.sleep(10)
+    
+    input()    
     mgr.join()
     
-    data = memory.get_data()
+    data = memory_1.get_data()
     print(data)

@@ -17,7 +17,7 @@ class SharedMemoeryData:
         assert 'list_size' in memory_info
         assert 'dtype' in memory_info
         
-        self.memory_info = memory_info
+        self.memory_info = memory_info.copy()
         self.shape = memory_info['shape']
         self.dtype = memory_info['dtype']
         self.list_size = memory_info['list_size']
@@ -67,7 +67,7 @@ class SharedMemoeryData:
         assert data.dtype == self.dtype
         self.array[self.current_frame_index.value] = data
         self.current_frame_index.value += 1
-        if self.current_frame_index == self.list_size:
+        if self.current_frame_index.value == self.list_size:
             self.has_full_data.value = True
             self.current_frame_index.value = 0
         
@@ -120,7 +120,10 @@ class SharedMemoryDataWithTime:
             self.memory._add_frame(data)
             time_data = np.array((time.perf_counter_ns(),))
             self.time_memory._add_frame(time_data)
+            if self.memory.current_frame_index.value != self.time_memory.current_frame_index.value:
+                input()
             assert self.memory.current_frame_index.value == self.time_memory.current_frame_index.value
+        return time_data[0]
         
     def get_frame(self, frame_index):
         with self.memory.condition:
@@ -154,8 +157,7 @@ class SharedMemoryDataWithTime:
                     
         return raw_data_list, time_data_list                    
         
-    @property
-    def memory_info(self):
+    def get_memory_info(self):
         return self.memory.memory_info, self.time_memory.memory_info
         
         

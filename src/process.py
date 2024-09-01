@@ -32,6 +32,9 @@ class Process(multiprocessing.Process):
     def _loop_func(self):
         raise NotImplementedError()
     
+    def _end_func(self):
+        pass
+    
     def start(self, 
               start_sync_event: Event,
               exit_event: Event,
@@ -54,6 +57,12 @@ class Process(multiprocessing.Process):
             self.status_flags[self.process_index] = True
         self.start_sync_event.wait()
         print(f"Start {self.process_index} process")
-        while not self.exit_event.is_set():
-            self._loop_func()
+        
+        try:
+            while not self.exit_event.is_set():
+                self._loop_func()
+        finally:
+            self._end_func()
+            
+        
         
